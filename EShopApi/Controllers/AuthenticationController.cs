@@ -1,7 +1,10 @@
-﻿using EShopApi.Data;
+﻿using AutoMapper;
+using EShopApi.Data;
 using EShopApi.Models;
 using EShopApi.Models.DTO;
 using EShopApi.Models.Responses;
+using EShopApi.Services;
+using EShopApi.Services.Data;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -13,47 +16,38 @@ namespace EShopApi.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    public class AuthenticationController : ControllerBase
+    public class AuthenticationController(Eshop2DbContext context, IConfiguration config, IMapper mapper,
+        IUserService userService, IAuthService authService) : ControllerBase
     {
-        private Eshop2DbContext _context;
-        private readonly IConfiguration _config;
-
-        public AuthenticationController(Eshop2DbContext context, IConfiguration config)
-        {
-            _context = context;
-            _config = config;
-        }
-
         [HttpPost("login")]
         public async Task<ActionResult<string>> Login(LoginDto loginDto)
         {
-            LoginResponse loginResponse = new LoginResponse();
-            User? user = await _context.Users
-                .FirstOrDefaultAsync(u => u.UserName == loginDto.UserName);
+            LoginResponse loginResponse = new();
+            User? user = await userService.GetUserByUserName(loginDto.UserName);
+
             if (user == null)
             {
                 loginResponse.Status = 2;
                 loginResponse.Message = "اطلاعات وارد شده صحیح نیست";
-                loginResponse.Token = string.Empty;
                 return Ok(loginResponse);
             }
 
             bool passwordIsValid = BCrypt.Net.BCrypt.Verify(loginDto.Password, user.Password);
             if (passwordIsValid)
             {
-                List<Claim> claims = new List<Claim>()
-                 {
+                List<Claim> claims =
+                 [
                      new Claim("UserId", user.UserId.ToString()),
                      new Claim("UserName", user.UserName)
-                 };
+                 ];
 
 
-                SymmetricSecurityKey key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes((_config["Jwt:Key"]) ?? ""));
-                SigningCredentials creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+                SymmetricSecurityKey key = new(Encoding.UTF8.GetBytes((config["Jwt:Key"]) ?? ""));
+                SigningCredentials creds = new(key, SecurityAlgorithms.HmacSha256);
 
-                JwtSecurityToken token = new JwtSecurityToken(
-                    issuer: _config["Jwt:Issuer"],
-                    audience: _config["Jwt:Audience"],
+                JwtSecurityToken token = new(
+                    issuer: config["Jwt:Issuer"],
+                    audience: config["Jwt:Audience"],
                     claims: claims,
                     expires: DateTime.Now.AddHours(4),
                     signingCredentials: creds
@@ -67,7 +61,6 @@ namespace EShopApi.Controllers
 
             loginResponse.Status = 2;
             loginResponse.Message = "اطلاعات وارد شده صحیح نیست";
-            loginResponse.Token = string.Empty;
             return Ok(loginResponse);
         }
 
@@ -75,20 +68,20 @@ namespace EShopApi.Controllers
         public async Task<ActionResult> Register(RegisterDto registerDto)
 
         {
-            LoginResponse generalResponse = new LoginResponse();
-            if (await _context.Users.AnyAsync(u => u.UserName == registerDto.UserName))
+            LoginResponse generalResponse = new();
+            if (await context.Users.AnyAsync(u => u.UserName == registerDto.UserName))
             {
                 generalResponse.Status = 2;
                 generalResponse.Message = "این نام کاربری قبلا ثبت شده است!";
             }
-            else if (await _context.Users.AnyAsync(u => u.PhoneNumber == registerDto.PhoneNumber))
+            else if (await context.Users.AnyAsync(u => u.PhoneNumber == registerDto.PhoneNumber))
             {
                 generalResponse.Status = 2;
                 generalResponse.Message = "این شماره موبایل قبلا ثبت شده است!";
             }
             else
             {
-                User user = new User()
+                User user = new()
                 {
                     Fname = registerDto.FName,
                     Lname = registerDto.LName,
@@ -96,22 +89,22 @@ namespace EShopApi.Controllers
                     UserName = registerDto.UserName ?? string.Empty,
                     Password = BCrypt.Net.BCrypt.HashPassword(registerDto.Password) ?? string.Empty,
                 };
-                await _context.Users.AddAsync(user);
-                await _context.SaveChangesAsync();
+                await context.Users.AddAsync(user);
+                await context.SaveChangesAsync();
 
-                List<Claim> claims = new List<Claim>()
-                 {
+                List<Claim> claims =
+                 [
                      new Claim("UserId", user.UserId.ToString()),
                      new Claim("UserName", user.UserName)
-                 };
+                 ];
 
 
-                SymmetricSecurityKey key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes((_config["Jwt:Key"]) ?? ""));
-                SigningCredentials creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+                SymmetricSecurityKey key = new(Encoding.UTF8.GetBytes((config["Jwt:Key"]) ?? ""));
+                SigningCredentials creds = new(key, SecurityAlgorithms.HmacSha256);
 
-                JwtSecurityToken token = new JwtSecurityToken(
-                    issuer: _config["Jwt:Issuer"],
-                    audience: _config["Jwt:Audience"],
+                JwtSecurityToken token = new(
+                    issuer: config["Jwt:Issuer"],
+                    audience: config["Jwt:Audience"],
                     claims: claims,
                     expires: DateTime.Now.AddHours(4),
                     signingCredentials: creds
@@ -124,26 +117,19 @@ namespace EShopApi.Controllers
             return Ok(generalResponse);
         }
 
-        [HttpGet("{userId}")]
-        public async Task<ActionResult<UserDto>> GetProductById(Guid userId)
+        [HttpGet]
+        public async Task<ActionResult<UserDto>> GetUserById()
         {
-            User? user = await _context.Users.FirstOrDefaultAsync(u => u.UserId == userId);
+            string token = Request.Headers.Authorization.ToString();
+            Guid? userId = authService.GetUserIdFromJwt(token);
+            if (userId == null)
+                return Unauthorized();
 
+            User? user = await userService.GetUserById(userId);
             if (user == null)
-            {
-                return NotFound();
-            }
+                return Unauthorized();
 
-            UserDto userDto = new UserDto()
-            {
-                UserId = user.UserId,
-                FName  = user.Fname,
-                LName = user.Lname,
-                PhoneNumber = user.PhoneNumber,
-                UserName = user.UserName,
-                IsAdmin = user.IsAdmin
-            };
-
+            UserDto userDto = mapper.Map<UserDto>(user);
             return Ok(userDto);
         }
     }

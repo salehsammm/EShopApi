@@ -1,4 +1,6 @@
 using EShopApi.Data;
+using EShopApi.Services;
+using EShopApi.Services.Data;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
@@ -8,37 +10,33 @@ using static System.Runtime.InteropServices.JavaScript.JSType;
 
 var builder = WebApplication.CreateBuilder(args);
 
-/*Add CORS service to the DI container
-builder.Services.AddCors(options =>
-{
-    options.AddPolicy("AllowLocalhost", policy =>
-    {
-        policy.WithOrigins("http://localhost:4200")  // The origin of your Angular app
-              .AllowAnyHeader()
-              .AllowAnyMethod();
-    });
-});*/
+#region Inject
+
+builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<IAuthService, AuthService>();
+
+#endregion
 
 
-// Add services to the container.
 builder.Services.AddDbContext<Eshop2DbContext>(options =>
   options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-/*Add JWT Authentication
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+
+
+builder.Services.AddAuthentication("Bearer")
     .AddJwtBearer(options =>
     {
-        options.TokenValidationParameters = new TokenValidationParameters
+        options.TokenValidationParameters = new()
         {
             ValidateIssuer = true,
             ValidateAudience = true,
             ValidateLifetime = true,
             ValidateIssuerSigningKey = true,
             ValidIssuer = builder.Configuration["Jwt:Issuer"],
-            ValidAudience = builder.Configuration["Jwt:Issuer"],
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]))
+            ValidAudience = builder.Configuration["Jwt:Audience"],
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"] ?? ""))
         };
-    });*/
+    });
 
 
 builder.Services.AddControllers();
@@ -49,8 +47,6 @@ builder.Services.AddAutoMapper(AppDomain.CurrentDomain.GetAssemblies());
 
 var app = builder.Build();
 
-// Enable CORS globally
-//app.UseCors("AllowLocalhost");
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())

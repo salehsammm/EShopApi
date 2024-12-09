@@ -15,5 +15,7 @@ public partial class Product
 
     public string? Description { get; set; }
 
+    public string Slug { get; set; } = null!;
+
     public virtual ICollection<ShoppingCartItem> ShoppingCartItems { get; set; } = new List<ShoppingCartItem>();
 }

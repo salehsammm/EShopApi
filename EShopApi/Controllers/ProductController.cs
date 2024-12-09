@@ -7,18 +7,12 @@ namespace EShopApi.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    public class ProductController : ControllerBase
+    public class ProductController(Eshop2DbContext context) : ControllerBase
     {
-        private Eshop2DbContext _context;
-        public ProductController(Eshop2DbContext context)
-        {
-            _context = context;
-        }
-
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Product>>> GetProducts()
         {
-            IList<Product> products = await _context.Products.ToListAsync();
+            IList<Product> products = await context.Products.ToListAsync();
 
             return Ok(products);
         }
@@ -26,7 +20,7 @@ namespace EShopApi.Controllers
         [HttpGet("{productId}")]
         public async Task<ActionResult<Product>> GetProductById(Guid productId)
         {
-            Product? product = await _context.Products.FirstOrDefaultAsync(p => p.ProductId == productId);
+            Product? product = await context.Products.FirstOrDefaultAsync(p => p.ProductId == productId);
 
             if (product == null)
             {

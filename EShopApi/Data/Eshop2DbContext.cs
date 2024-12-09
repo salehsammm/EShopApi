@@ -1,4 +1,6 @@
-﻿using EShopApi.Models;
+﻿using System;
+using System.Collections.Generic;
+using EShopApi.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace EShopApi.Data;
@@ -33,9 +35,12 @@ public partial class Eshop2DbContext : DbContext
 
             entity.ToTable("Product");
 
+            entity.HasIndex(e => e.Slug, "uniqueSlug_Product").IsUnique();
+
             entity.Property(e => e.ProductId).HasDefaultValueSql("(newid())");
             entity.Property(e => e.ImgUrl).HasMaxLength(500);
             entity.Property(e => e.Name).HasMaxLength(200);
+            entity.Property(e => e.Slug).HasMaxLength(200);
         });
 
         modelBuilder.Entity<ShoppingCart>(entity =>
