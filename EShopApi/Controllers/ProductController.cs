@@ -30,5 +30,16 @@ namespace EShopApi.Controllers
             return Ok(product);
         }
 
+        [HttpGet("slug/{productSlug}")]
+        public async Task<ActionResult<Product>> GetProductBySlug(string productSlug)
+        {
+            Product? product = await context.Products.FirstOrDefaultAsync(p => p.Slug == productSlug);
+
+            if (product == null)
+                return NotFound();
+
+            return Ok(product);
+        }
+
     }
 }

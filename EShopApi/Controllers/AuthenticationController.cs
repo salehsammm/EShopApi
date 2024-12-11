@@ -5,6 +5,7 @@ using EShopApi.Models.DTO;
 using EShopApi.Models.Responses;
 using EShopApi.Services;
 using EShopApi.Services.Data;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -16,7 +17,7 @@ namespace EShopApi.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    public class AuthenticationController(Eshop2DbContext context, IConfiguration config, IMapper mapper,
+    public class AuthenticationController(Eshop2DbContext context, IMapper mapper,
         IUserService userService, IAuthService authService) : ControllerBase
     {
         [HttpPost("login")]
@@ -24,39 +25,16 @@ namespace EShopApi.Controllers
         {
             LoginResponse loginResponse = new();
             User? user = await userService.GetUserByUserName(loginDto.UserName);
-
-            if (user == null)
+            if (user!=null)
             {
-                loginResponse.Status = 2;
-                loginResponse.Message = "اطلاعات وارد شده صحیح نیست";
-                return Ok(loginResponse);
-            }
-
-            bool passwordIsValid = BCrypt.Net.BCrypt.Verify(loginDto.Password, user.Password);
-            if (passwordIsValid)
-            {
-                List<Claim> claims =
-                 [
-                     new Claim("UserId", user.UserId.ToString()),
-                     new Claim("UserName", user.UserName)
-                 ];
-
-
-                SymmetricSecurityKey key = new(Encoding.UTF8.GetBytes((config["Jwt:Key"]) ?? ""));
-                SigningCredentials creds = new(key, SecurityAlgorithms.HmacSha256);
-
-                JwtSecurityToken token = new(
-                    issuer: config["Jwt:Issuer"],
-                    audience: config["Jwt:Audience"],
-                    claims: claims,
-                    expires: DateTime.Now.AddHours(4),
-                    signingCredentials: creds
-                );
-
-                loginResponse.Status = 1;
-                loginResponse.Message = "با موفقیت وارد شدید";
-                loginResponse.Token = new JwtSecurityTokenHandler().WriteToken(token);
-                return Ok(loginResponse);
+                bool passwordIsValid = BCrypt.Net.BCrypt.Verify(loginDto.Password, user.Password);
+                if (passwordIsValid)
+                {
+                    loginResponse.Status = 1;
+                    loginResponse.Message = "با موفقیت وارد شدید";
+                    loginResponse.Token = authService.GenerateJwt(user.UserId, user.UserName);
+                    return Ok(loginResponse);
+                }
             }
 
             loginResponse.Status = 2;
@@ -66,7 +44,6 @@ namespace EShopApi.Controllers
 
         [HttpPost("register")]
         public async Task<ActionResult> Register(RegisterDto registerDto)
-
         {
             LoginResponse generalResponse = new();
             if (await context.Users.AnyAsync(u => u.UserName == registerDto.UserName))
@@ -92,31 +69,14 @@ namespace EShopApi.Controllers
                 await context.Users.AddAsync(user);
                 await context.SaveChangesAsync();
 
-                List<Claim> claims =
-                 [
-                     new Claim("UserId", user.UserId.ToString()),
-                     new Claim("UserName", user.UserName)
-                 ];
-
-
-                SymmetricSecurityKey key = new(Encoding.UTF8.GetBytes((config["Jwt:Key"]) ?? ""));
-                SigningCredentials creds = new(key, SecurityAlgorithms.HmacSha256);
-
-                JwtSecurityToken token = new(
-                    issuer: config["Jwt:Issuer"],
-                    audience: config["Jwt:Audience"],
-                    claims: claims,
-                    expires: DateTime.Now.AddHours(4),
-                    signingCredentials: creds
-                );
-
                 generalResponse.Status = 1;
                 generalResponse.Message = " ثبت نام با موفقیت انجام شد";
-                generalResponse.Token = new JwtSecurityTokenHandler().WriteToken(token);
+                generalResponse.Token = authService.GenerateJwt(user.UserId, user.UserName);
             }
             return Ok(generalResponse);
         }
 
+        [Authorize]
         [HttpGet]
         public async Task<ActionResult<UserDto>> GetUserById()
         {

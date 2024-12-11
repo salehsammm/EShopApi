@@ -11,6 +11,7 @@ using System.IdentityModel.Tokens.Jwt;
 
 namespace EShopApi.Controllers
 {
+    [Authorize]
     [Route("api/[controller]")]
     [ApiController]
     public class ShoppingCartController(Eshop2DbContext context, IMapper mapper, IAuthService authService) : ControllerBase
@@ -90,29 +91,25 @@ namespace EShopApi.Controllers
         public async Task<ActionResult<ShoppingCart>> GetShoppingCart()
         {
             string token = Request.Headers.Authorization.ToString();
-            if (string.IsNullOrEmpty(token)) return Unauthorized();
-            string JwtToken = token.StartsWith("Bearer ") ? token[7..] : token;
-            JwtSecurityTokenHandler handler = new();
-            var jsonToken = handler.ReadJwtToken(JwtToken);
-            string? userId = jsonToken.Payload["UserId"]?.ToString();
-            if (Guid.TryParse(userId, out Guid userId2))
-            {
-                CartResponse cartResponse = new();
-                ShoppingCart? shoppingCart = await context.ShoppingCarts
-                    .Include(s => s.ShoppingCartItems)
-                    .ThenInclude(s => s.Product)
-                    .FirstOrDefaultAsync(s => s.UserId == userId2 && s.IsFinal == false);
+            Guid? userId = authService.GetUserIdFromJwt(token);
+            if (userId == null)
+                return Unauthorized();
 
-                if (shoppingCart == null)
-                {
-                    cartResponse.Status = 2;
-                    return Ok(cartResponse);
-                }
+            CartResponse cartResponse = new();
+            ShoppingCart? shoppingCart = await context.ShoppingCarts
+                .Include(s => s.ShoppingCartItems)
+                .ThenInclude(s => s.Product)
+                .FirstOrDefaultAsync(s => s.UserId == userId && s.IsFinal == false);
+
+            if (shoppingCart != null)
+            {
                 cartResponse.Status = 1;
                 cartResponse.shoppingCartDto = mapper.Map<ShoppingCartDto>(shoppingCart);
                 return Ok(cartResponse);
             }
-            return Unauthorized();
+
+            cartResponse.Status = 2;
+            return Ok(cartResponse);
         }
 
     }
