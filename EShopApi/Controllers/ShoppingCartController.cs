@@ -14,7 +14,7 @@ namespace EShopApi.Controllers
     [Authorize]
     [Route("api/[controller]")]
     [ApiController]
-    public class ShoppingCartController(Eshop2DbContext context, IMapper mapper, IAuthService authService) : ControllerBase
+    public class ShoppingCartController(Eshop2DbContext context, IAuthService authService) : ControllerBase
     {
         [HttpPost("add/{productId}")]
         public async Task<ActionResult<IEnumerable<Product>>> AddToCart(Guid productId)
@@ -96,15 +96,36 @@ namespace EShopApi.Controllers
                 return Unauthorized();
 
             CartResponse cartResponse = new();
-            ShoppingCart? shoppingCart = await context.ShoppingCarts
-                .Include(s => s.ShoppingCartItems)
-                .ThenInclude(s => s.Product)
-                .FirstOrDefaultAsync(s => s.UserId == userId && s.IsFinal == false);
+            //ShoppingCart? shoppingCart = await context.ShoppingCarts
+            //    .Include(s => s.ShoppingCartItems)
+            //    .ThenInclude(s => s.Product)
+            //    .FirstOrDefaultAsync(s => s.UserId == userId && s.IsFinal == false);
+
+            ShoppingCartDto? shoppingCart = await context.ShoppingCarts
+                .Where(s => s.UserId == userId && s.IsFinal == false)
+                .Select(s => new ShoppingCartDto
+                {
+                    CreateAt = s.CreateAt,
+                    IsFinal = s.IsFinal,
+                    ShoppingCartId = s.ShoppingCartId,
+                    ShoppingCartItems = s.ShoppingCartItems
+                        .Select(item => new ShoppingCartItemDto
+                        {
+                            ShoppingCartItemId = item.ShoppingCartItemId,
+                            Count = item.Count,
+                            ProductId = item.ProductId,
+                            ProductName = item.Product.Name,
+                            ProductPrice = item.Product.Price,
+                            ProductImgUrl = item.Product.ImgUrl,
+                            ProductSlug = item.Product.Slug
+                        }).ToList()
+                }).FirstOrDefaultAsync();
 
             if (shoppingCart != null)
             {
                 cartResponse.Status = 1;
-                cartResponse.shoppingCartDto = mapper.Map<ShoppingCartDto>(shoppingCart);
+                //cartResponse.shoppingCartDto = mapper.Map<ShoppingCartDto>(shoppingCart);
+                cartResponse.shoppingCartDto = shoppingCart;
                 return Ok(cartResponse);
             }
 
