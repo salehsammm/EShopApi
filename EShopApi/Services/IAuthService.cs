@@ -8,7 +8,6 @@ namespace EShopApi.Services
 {
     public interface IAuthService
     {
-        Guid GetUserIdFromJwt(string jwt);
         string GenerateJwt(Guid userId, string userName);
     }
 
@@ -35,20 +34,6 @@ namespace EShopApi.Services
 
             return new JwtSecurityTokenHandler().WriteToken(token);
         }
-
-        public Guid GetUserIdFromJwt(string jwt)
-        {
-            if (!(string.IsNullOrEmpty(jwt)))
-            {
-                string JwtToken = jwt.StartsWith("Bearer ") ? jwt[7..] : jwt;
-                JwtSecurityTokenHandler handler = new();
-                var jsonToken = handler.ReadJwtToken(JwtToken);
-                string? userId2 = jsonToken.Payload["UserId"]?.ToString();
-                if (Guid.TryParse(userId2, out Guid userId))
-                    return userId;
-            }
-
-            throw new InvalidOperationException("User ID could not be extracted from the JWT.");
-        }
+   
     }
 }

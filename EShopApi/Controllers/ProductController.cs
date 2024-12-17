@@ -40,6 +40,5 @@ namespace EShopApi.Controllers
 
             return Ok(product);
         }
-
     }
 }

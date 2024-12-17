@@ -12,6 +12,6 @@
                 return ShoppingCartItems.Sum(s => (s.ProductPrice ?? 0) * s.Count);
             }
         }
-        public List<ShoppingCartItemDto> ShoppingCartItems { get; set; } = new();
+        public List<ShoppingCartItemDto> ShoppingCartItems { get; set; } = [];
     }
 }

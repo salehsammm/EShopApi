@@ -17,11 +17,10 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 
 #endregion
 
-
 builder.Services.AddDbContext<Eshop2DbContext>(options =>
   options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-
+#region Authentication
 
 builder.Services.AddAuthentication("Bearer")
     .AddJwtBearer(options =>
@@ -38,24 +37,22 @@ builder.Services.AddAuthentication("Bearer")
         };
     });
 
+#endregion
+
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddAutoMapper(AppDomain.CurrentDomain.GetAssemblies());
 
-
 var app = builder.Build();
 
-
-// Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
 }
 
-// Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -64,7 +61,6 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-// Ensure CORS comes before Authorization/Authentication middleware
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();

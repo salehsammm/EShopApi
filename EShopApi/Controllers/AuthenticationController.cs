@@ -8,10 +8,7 @@ using EShopApi.Services.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.IdentityModel.Tokens;
-using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
-using System.Text;
 
 namespace EShopApi.Controllers
 {
@@ -78,19 +75,48 @@ namespace EShopApi.Controllers
 
         [Authorize]
         [HttpGet]
-        public async Task<ActionResult<UserDto>> GetUserById()
+        public async Task<ActionResult<UserDto>> GetUser()
         {
-            string token = Request.Headers.Authorization.ToString();
-            Guid? userId = authService.GetUserIdFromJwt(token);
-            if (userId == null)
-                return Unauthorized();
+            var userClaim = HttpContext.User;
+            Claim? userIdClaim = userClaim.Claims.FirstOrDefault(c => c.Type == "UserId");
+            Guid userId = Guid.Empty;
+            if (userIdClaim != null && Guid.TryParse(userIdClaim.Value, out userId))
+            {
+                User? user = await userService.GetUserById(userId);
+                if (user == null)
+                    return Unauthorized();
 
-            User? user = await userService.GetUserById(userId);
+                UserDto userDto = mapper.Map<UserDto>(user);
+                return Ok(userDto);
+            }
+            return Unauthorized();
+        }
+
+        [HttpPut]
+        public async Task<ActionResult> EditUser(UserDto userDto)
+        {
+            User? user = await context.Users.FindAsync(userDto.UserId);
             if (user == null)
-                return Unauthorized();
+                return NotFound();
 
-            UserDto userDto = mapper.Map<UserDto>(user);
-            return Ok(userDto);
+            if (context.Users.Any(u => (u.PhoneNumber == userDto.PhoneNumber) && (u.UserId != userDto.UserId) ))
+            {
+                return NotFound();
+            }
+
+            if (context.Users.Any(u => (u.UserName == userDto.UserName) && (u.UserId != userDto.UserId)))
+            {
+                return NotFound();
+            }
+
+            user.UserName = userDto.UserName;
+            user.Fname = userDto.FName;
+            user.Lname = userDto.LName;
+            user.PhoneNumber = userDto.PhoneNumber;
+            context.Entry(user).State = EntityState.Modified;
+            await context.SaveChangesAsync();
+
+            return Ok();
         }
     }
 }
